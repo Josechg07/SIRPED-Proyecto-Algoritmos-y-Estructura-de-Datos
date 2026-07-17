@@ -1,0 +1,9 @@
+# archivo de prueba SIRPED
+1|Juan Perez|15/03/2024|Ciudad de Mexico|Buscando|Visto por ultima vez en el parque
+2|Maria Lopez|02/01/2023|Guadalajara|Encontrado|Localizada con familiares
+3|Carlos Ruiz|20/07/2024|Monterrey|Buscando|Salio de su trabajo y no volvio
+4|Ana Torres|11/11/2022|Puebla|Cerrado|Caso cerrado por autoridades
+5|Pedro Gomez|15/03/2024|Tijuana|Buscando|Ultima vez visto en la central camionera
+
+esta linea esta mal
+6|Lucia Fernandez|30/06/2021|Cancun|Encontrado|Regreso a su domicilio
