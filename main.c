@@ -1,65 +1,122 @@
-/* ============================================================================
- * main.c
- * ----------------------------------------------------------------------------
- * Proyecto: SIRPED (Sistema de Registro y Seguimiento de Personas Desaparecidas)
- * Módulo:   Ordenamiento + Integración (main, menú, memoria)
- * ----------------------------------------------------------------------------
- * Punto de entrada del sistema SIRPED. Su única responsabilidad es arrancar
- * el menú interactivo, que a su vez coordina el resto de los módulos.
- *
- * Toda la memoria dinámica reservada durante la ejecución (arreglo de
- * carga masiva, nodos del árbol AVL simulado y nodos de las listas de
- * historial) es liberada dentro de ejecutar_menu() cuando el usuario
- * selecciona la opción "5. Salir", por lo que al terminar main() no debe
- * quedar ningún bloque de memoria dinámica sin liberar (verificable con
- * Valgrind, ver instrucciones al final de este archivo).
- * ============================================================================
- */
-
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "estructuras.h"
-#include "menu.c" 
+#include "arbol_avl.h"
+#include "consultas.h"
+#include "lista_historial.h"
+#include "menu.h"
+#include "memoria.h"
+#include "parser.h"
+#include "ordenamiento.h"
 
-int main(void) {
-    printf("Iniciando SIRPED...\n");
+int main() {
+    NodoAVL* raiz_sistema = NULL;
+    int opcion;
 
-    /* 
-     * NOTA: Si necesitas hacer pruebas manuales del historial antes de arrancar el menú,
-     * descomenta las siguientes líneas. De lo contrario, ejecutar_menu() se encarga de todo.
-     *
-     * NodoHistorial* historial = NULL;
-     * historial = insertar_historial(historial, crear_nodo_historial("24/06/2026", "Reportado desaparecido en La Guaira"));
-     * historial = insertar_historial(historial, crear_nodo_historial("02/07/2026", "Encontrado con heridas, trasladado al hospital"));
-     * imprimir_historial(historial);
-     * liberar_historial(historial);
-     */
+    /* Precarga simulada inicial, útil para probar el sistema de una vez */
+    raiz_sistema = insertar_caso(raiz_sistema, "SIRPED-001", "Pedro Aguila", "2026-06-24", "La Guaira", "Desaparecido", "Reporte Inicial.");
+    raiz_sistema = insertar_caso(raiz_sistema, "SIRPED-002", "Maria Espinoza", "2026-07-01", "Caracas", "Desaparecido", "Salio de su residencia.");
 
-    // Arranca el flujo principal del sistema
-    ejecutar_menu();
+    do {
+        desplegar_menu();
+        if (scanf("%d", &opcion) != 1) {
+            break;
+        }
+        getchar(); /* Limpiar búfer */
 
-    printf("Programa finalizado sin fugas de memoria pendientes.\n");
+        if (opcion == 1) {
+            char id[20], nombre[100], fecha[16], zona[100], desc[256];
+            printf("ID unico (Ej: SIRPED-003): ");
+            fgets(id, sizeof(id), stdin); id[strcspn(id, "\n")] = 0;
+            printf("Nombre: ");
+            fgets(nombre, sizeof(nombre), stdin); nombre[strcspn(nombre, "\n")] = 0;
+            printf("Fecha (AAAA-MM-DD): ");
+            fgets(fecha, sizeof(fecha), stdin); fecha[strcspn(fecha, "\n")] = 0;
+            printf("Zona: ");
+            fgets(zona, sizeof(zona), stdin); zona[strcspn(zona, "\n")] = 0;
+            printf("Descripcion: ");
+            fgets(desc, sizeof(desc), stdin); desc[strcspn(desc, "\n")] = 0;
+
+            raiz_sistema = insertar_caso(raiz_sistema, id, nombre, fecha, zona, "Desaparecido", desc);
+            printf("\n[Exito] Caso insertado en AVL.\n");
+
+        } else if (opcion == 2) {
+            char id[20], fecha[16], ubica[100], est[50], desc[256];
+            printf("ID del caso a actualizar: ");
+            fgets(id, sizeof(id), stdin); id[strcspn(id, "\n")] = 0;
+
+            NodoAVL* encontrado = buscar_por_id(raiz_sistema, id);
+            if (encontrado) {
+                printf("Fecha Actualizacion (AAAA-MM-DD): ");
+                fgets(fecha, sizeof(fecha), stdin); fecha[strcspn(fecha, "\n")] = 0;
+                printf("Ubicacion: ");
+                fgets(ubica, sizeof(ubica), stdin); ubica[strcspn(ubica, "\n")] = 0;
+                printf("Estado: ");
+                fgets(est, sizeof(est), stdin); est[strcspn(est, "\n")] = 0;
+                printf("Detalles: ");
+                fgets(desc, sizeof(desc), stdin); desc[strcspn(desc, "\n")] = 0;
+
+                agregar_historial(encontrado, fecha, ubica, est, desc);
+                printf("\n[Exito] Historial actualizado.\n");
+            } else {
+                printf("\n[Error] No encontrado.\n");
+            }
+
+        } else if (opcion == 3) {
+            char inicio[16], fin[16];
+            printf("Fecha Inicio (AAAA-MM-DD): ");
+            fgets(inicio, sizeof(inicio), stdin); inicio[strcspn(inicio, "\n")] = 0;
+            printf("Fecha Fin (AAAA-MM-DD): ");
+            fgets(fin, sizeof(fin), stdin); fin[strcspn(fin, "\n")] = 0;
+            consultar_rango_fechas(raiz_sistema, inicio, fin);
+
+        } else if (opcion == 4) {
+            char zona[100];
+            printf("Zona a buscar: ");
+            fgets(zona, sizeof(zona), stdin); zona[strcspn(zona, "\n")] = 0;
+            consultar_por_zona(raiz_sistema, zona);
+
+        } else if (opcion == 5) {
+            char id[20];
+            printf("ID del caso: ");
+            fgets(id, sizeof(id), stdin); id[strcspn(id, "\n")] = 0;
+            NodoAVL* encontrado = buscar_por_id(raiz_sistema, id);
+            if (encontrado) mostrar_caso(encontrado);
+            else printf("\nNo encontrado.\n");
+
+        } else if (opcion == 6) {
+            char ruta[256];
+            int cantidad = 0;
+
+            printf("Ruta del archivo .txt a cargar (ej. reportes.txt): ");
+            fgets(ruta, sizeof(ruta), stdin); ruta[strcspn(ruta, "\n")] = 0;
+
+            ReporteCrudo* reportes = cargar_reportes_desde_archivo(ruta, &cantidad);
+            if (reportes == NULL || cantidad == 0) {
+                printf("\n[Error] No se cargó ningún reporte válido.\n");
+            } else {
+                printf("Se leyeron %d reportes desde el archivo.\n", cantidad);
+
+                /* Ordenamiento cronológico con Merge Sort antes de insertar */
+                merge_sort_reportes(reportes, 0, cantidad - 1);
+                printf("Reportes ordenados cronológicamente (Merge Sort).\n");
+
+                for (int i = 0; i < cantidad; i++) {
+                    raiz_sistema = insertar_caso(raiz_sistema,
+                        reportes[i].id_caso, reportes[i].nombre_persona,
+                        reportes[i].fecha, reportes[i].zona_geografica,
+                        reportes[i].estado, reportes[i].descripcion);
+                }
+                printf("[Exito] %d casos insertados en el árbol.\n", cantidad);
+
+                free(reportes); /* arreglo temporal, ya insertado en el árbol */
+            }
+        }
+
+    } while (opcion != 7);
+
+    printf("\nLiberando recursos dinámicos...\n");
+    liberar_sistema(raiz_sistema);
     return 0;
 }
-
-/* ============================================================================
- * INSTRUCCIONES DE COMPILACIÓN Y PRUEBA DE MEMORIA (Valgrind)
- * ----------------------------------------------------------------------------
- * 1) COMPILAR (usando C99 y advertencias estrictas):
- *
- *      gcc -std=c99 -Wall -Wextra -g -o sirped main.c menu.c parser.c \
- *          ordenamiento.c memoria.c
- *
- *    -Wall -Wextra  -> activa advertencias adicionales del compilador.
- *    -g             -> incluye información de depuración (necesaria para
- *                      que Valgrind muestre líneas exactas del código).
- *
- * 2) EJECUTAR NORMALMENTE:
- *
- *      ./sirped
- *
- * 3) VERIFICAR FUGAS DE MEMORIA CON VALGRIND:
- *
- *      valgrind --leak-check=full --show-leak-kinds=all \
- *          --track-origins=yes ./sirped
- * ============================================================================
- */
