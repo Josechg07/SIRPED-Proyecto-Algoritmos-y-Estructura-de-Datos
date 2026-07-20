@@ -10,6 +10,41 @@
 #include "parser.h"
 #include "ordenamiento.h"
 
+static void escribir_nodo_archivo(FILE* archivo, NodoAVL* nodo) {
+    if (nodo == NULL) return;
+
+    escribir_nodo_archivo(archivo, nodo->izquierdo);
+
+    const NodoHistorial* ultimo = nodo->historial;
+    while (ultimo != NULL && ultimo->siguiente != NULL) {
+        ultimo = ultimo->siguiente;
+    }
+
+    const char* estado = (ultimo != NULL) ? ultimo->estado : "Desaparecido";
+    const char* descripcion = (ultimo != NULL) ? ultimo->descripcion : "";
+
+    fprintf(archivo, "%s|%s|%s|%s|%s|%s\n",
+            nodo->id_caso,
+            nodo->nombre_persona,
+            nodo->fecha_inicial,
+            nodo->zona_geografica,
+            estado,
+            descripcion);
+
+    escribir_nodo_archivo(archivo, nodo->derecho);
+}
+
+static void guardar_arbol_en_archivo(const char* ruta, NodoAVL* raiz) {
+    FILE* archivo = fopen(ruta, "w");
+    if (archivo == NULL) {
+        fprintf(stderr, "[ERROR] No se pudo abrir '%s' para guardar los casos.\n", ruta);
+        return;
+    }
+
+    escribir_nodo_archivo(archivo, raiz);
+    fclose(archivo);
+}
+
 int main() {
     NodoAVL* raiz_sistema = NULL;
     int opcion;
@@ -39,7 +74,8 @@ int main() {
             fgets(desc, sizeof(desc), stdin); desc[strcspn(desc, "\n")] = 0;
 
             raiz_sistema = insertar_caso(raiz_sistema, id, nombre, fecha, zona, "Desaparecido", desc);
-            printf("\n[Exito] Caso insertado en AVL.\n");
+            guardar_arbol_en_archivo("reportes.txt", raiz_sistema);
+            printf("\n[Exito] Caso insertado en AVL y guardado en reportes.txt.\n");
 
         } else if (opcion == 2) {
             char id[20], fecha[16], ubica[100], est[50], desc[256];
@@ -58,7 +94,8 @@ int main() {
                 fgets(desc, sizeof(desc), stdin); desc[strcspn(desc, "\n")] = 0;
 
                 agregar_historial(encontrado, fecha, ubica, est, desc);
-                printf("\n[Exito] Historial actualizado.\n");
+                guardar_arbol_en_archivo("reportes.txt", raiz_sistema);
+                printf("\n[Exito] Historial actualizado y guardado en reportes.txt.\n");
             } else {
                 printf("\n[Error] No encontrado.\n");
             }
@@ -114,7 +151,7 @@ int main() {
             }
         }
 
-    } while (opcion != 7);
+    } while (opcion != 6);
 
     printf("\nLiberando recursos dinámicos...\n");
     liberar_sistema(raiz_sistema);
