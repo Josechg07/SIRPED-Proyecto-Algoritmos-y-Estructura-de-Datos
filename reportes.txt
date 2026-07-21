@@ -1,3 +1,4 @@
-Prueba-001|Pedro|2026-06-24|La Guaira|Desaparecido|Desaparecido
+30750749|Agustin Diaz|2026-07-15|caracas|Desaparecido|
 SIRPED-001|Pedro Aguila|2026-06-24|La Guaira|Desaparecido|Reporte Inicial.
 SIRPED-002|Maria Espinoza|2026-07-01|Caracas|Desaparecido|Salio de su residencia.
+Sirped-009|Jose Ricardo Chacon|2026-07-20|caracas|Desaparecido|

@@ -15,5 +15,6 @@ void mostrar_caso(NodoAVL* nodo);
  */
 void consultar_rango_fechas(NodoAVL* raiz, const char* inicio, const char* fin);
 void consultar_por_zona(NodoAVL* raiz, const char* zona);
+void consultar_por_nombre(NodoAVL* raiz, const char* nombre);
 
 #endif

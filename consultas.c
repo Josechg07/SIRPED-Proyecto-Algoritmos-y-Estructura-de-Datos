@@ -61,3 +61,13 @@ void consultar_por_zona(NodoAVL* raiz, const char* zona) {
     }
     consultar_por_zona(raiz->derecho, zona);
 }
+
+/* Recorrido completo O(n), filtrando por nombre de persona usando substring. */
+void consultar_por_nombre(NodoAVL* raiz, const char* nombre) {
+    if (raiz == NULL) return;
+    consultar_por_nombre(raiz->izquierdo, nombre);
+    if (strstr(raiz->nombre_persona, nombre) != NULL) {
+        mostrar_caso(raiz);
+    }
+    consultar_por_nombre(raiz->derecho, nombre);
+}
