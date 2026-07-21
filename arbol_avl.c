@@ -1,299 +1,133 @@
-/*
- * ===========================================================================
- *  arbol_avl.c
- *  Sistema de Recoleccion de Datos — Desaparecidos Terremoto Venezuela 2026
- * ---------------------------------------------------------------------------
- *  Implementacion del arbol AVL con insercion balanceada,
- *  busqueda exacta, busqueda por rango y recorrido in-order.
- *
- *  Rotaciones implementadas:
- *    - Rotacion simple a la derecha  (caso LL)
- *    - Rotacion simple a la izquierda (caso RR)
- *    - Rotacion doble izquierda-derecha (caso LR)
- *    - Rotacion doble derecha-izquierda (caso RL)
- * ===========================================================================
- */
+/* ============================================================================
+ * arbol_avl.c
+ * ----------------------------------------------------------------------------
+ * Árbol AVL (auto-balanceado) indexado por id_caso (clave única de cada
+ * caso). Se eligió el id como clave -y no la fecha ni el nombre- porque:
+ *   - Es único por caso, así que nunca hay ambigüedad al buscar/actualizar.
+ *   - La operación más frecuente del sistema (registrar, actualizar y
+ *     buscar un caso puntual) queda en O(log n).
+ *   - Evita el riesgo de fusionar por error el historial de dos personas
+ *     distintas que compartan el mismo nombre.
+ * Las consultas por rango de fechas y por zona (ordenamiento.c) recorren
+ * el árbol completo -O(n)- porque esos campos no son la clave del árbol;
+ * es una decisión consciente y así se documenta en el informe técnico.
+ * ============================================================================ */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
 #include "arbol_avl.h"
-#include "lista.h"          /* Aqui si incluimos la implementacion completa */
-#include "desaparecido.h"   /* Para operar con los datos de la persona     */
+#include "lista_historial.h"
 
-/* ═══════════════════════════════════════════════════════════════════════════
- *  FUNCIONES INTERNAS (static)
- * ═══════════════════════════════════════════════════════════════════════════ */
+static int max_val(int a, int b) { return (a > b) ? a : b; }
 
-/* ── Obtener altura de un nodo (0 si es NULL) ────────────────────────────── */
-
-static int altura(NodoAVL *nodo)
-{
-    return nodo ? nodo->altura : 0;
+static int obtener_altura(NodoAVL* n) {
+    return (n == NULL) ? 0 : n->altura;
 }
 
-/* ── Maximo entre dos enteros ────────────────────────────────────────────── */
-
-static int maximo(int a, int b)
-{
-    return (a > b) ? a : b;
+static int obtener_balance(NodoAVL* n) {
+    return (n == NULL) ? 0 : obtener_altura(n->izquierdo) - obtener_altura(n->derecho);
 }
-
-/* ── Factor de balance: altura(izq) - altura(der) ───────────────────────── */
-
-static int factorBalance(NodoAVL *nodo)
-{
-    return nodo ? altura(nodo->izq) - altura(nodo->der) : 0;
-}
-
-/* ── Crear un nuevo nodo AVL ─────────────────────────────────────────────── */
-
-static NodoAVL* crearNodo(const char *clave)
-{
-    NodoAVL *nodo = (NodoAVL *)malloc(sizeof(NodoAVL));
-    if (!nodo) {
-        fprintf(stderr, "[ERROR] No se pudo asignar memoria para NodoAVL.\n");
-        return NULL;
-    }
-
-    strncpy(nodo->clave, clave, 63);
-    nodo->clave[63] = '\0';
-    nodo->lista  = NULL;
-    nodo->izq    = NULL;
-    nodo->der    = NULL;
-    nodo->altura = 1;   /* Un nodo hoja tiene altura 1 */
-
-    return nodo;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  ROTACIONES AVL
- * ═══════════════════════════════════════════════════════════════════════════ */
 
 /*
- *  Rotacion simple a la derecha (caso Left-Left):
- *
+ *  Rotacion simple a la derecha (caso Izquierda-Izquierda):
  *        y                x
  *       / \              / \
  *      x   T3    →     T1   y
  *     / \                  / \
  *   T1   T2              T2   T3
  */
-static NodoAVL* rotarDerecha(NodoAVL *y)
-{
-    NodoAVL *x  = y->izq;
-    NodoAVL *T2 = x->der;
+static NodoAVL* rotar_derecha(NodoAVL* y) {
+    NodoAVL* x = y->izquierdo;
+    NodoAVL* t2 = x->derecho;
 
-    /* Realizar la rotacion */
-    x->der = y;
-    y->izq = T2;
+    x->derecho = y;
+    y->izquierdo = t2;
 
-    /* Actualizar alturas (y primero, porque ahora es hijo de x) */
-    y->altura = 1 + maximo(altura(y->izq), altura(y->der));
-    x->altura = 1 + maximo(altura(x->izq), altura(x->der));
+    y->altura = 1 + max_val(obtener_altura(y->izquierdo), obtener_altura(y->derecho));
+    x->altura = 1 + max_val(obtener_altura(x->izquierdo), obtener_altura(x->derecho));
 
-    return x;   /* x es la nueva raiz del subarbol */
+    return x;
 }
 
 /*
- *  Rotacion simple a la izquierda (caso Right-Right):
- *
+ *  Rotacion simple a la izquierda (caso Derecha-Derecha):
  *      x                  y
  *     / \                / \
  *   T1   y      →      x   T3
  *       / \            / \
  *     T2   T3        T1   T2
  */
-static NodoAVL* rotarIzquierda(NodoAVL *x)
-{
-    NodoAVL *y  = x->der;
-    NodoAVL *T2 = y->izq;
+static NodoAVL* rotar_izquierda(NodoAVL* x) {
+    NodoAVL* y = x->derecho;
+    NodoAVL* t2 = y->izquierdo;
 
-    /* Realizar la rotacion */
-    y->izq = x;
-    x->der = T2;
+    y->izquierdo = x;
+    x->derecho = t2;
 
-    /* Actualizar alturas (x primero, porque ahora es hijo de y) */
-    x->altura = 1 + maximo(altura(x->izq), altura(x->der));
-    y->altura = 1 + maximo(altura(y->izq), altura(y->der));
+    x->altura = 1 + max_val(obtener_altura(x->izquierdo), obtener_altura(x->derecho));
+    y->altura = 1 + max_val(obtener_altura(y->izquierdo), obtener_altura(y->derecho));
 
-    return y;   /* y es la nueva raiz del subarbol */
+    return y;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- *  INSERCION CON BALANCEO AUTOMATICO
- * ═══════════════════════════════════════════════════════════════════════════ */
+NodoAVL* insertar_caso(NodoAVL* nodo, const char* id, const char* nombre,
+                        const char* fecha, const char* zona,
+                        const char* est, const char* desc) {
+    if (nodo == NULL) {
+        NodoAVL* nuevo = (NodoAVL*)malloc(sizeof(NodoAVL));
+        if (!nuevo) {
+            fprintf(stderr, "[ERROR] No se pudo reservar memoria para NodoAVL.\n");
+            return NULL;
+        }
+        strncpy(nuevo->id_caso, id, 19);
+        nuevo->id_caso[19] = '\0';
+        strncpy(nuevo->nombre_persona, nombre, 99);
+        nuevo->nombre_persona[99] = '\0';
+        strncpy(nuevo->fecha_inicial, fecha, 10);
+        nuevo->fecha_inicial[10] = '\0';
+        strncpy(nuevo->zona_geografica, zona, 99);
+        nuevo->zona_geografica[99] = '\0';
+        nuevo->altura = 1;
+        nuevo->izquierdo = NULL;
+        nuevo->derecho = NULL;
+        nuevo->historial = NULL;
 
-NodoAVL* avlInsertar(NodoAVL *raiz, const char *clave,
-                     struct Desaparecido *persona)
-{
-    /* ── Paso 1: Insercion BST estandar ──────────────────────────────────── */
+        agregar_historial(nuevo, fecha, zona, est, desc);
+        return nuevo;
+    }
 
-    if (!raiz) {
-        NodoAVL *nodo = crearNodo(clave);
-        if (!nodo) return NULL;
-        nodo->lista = listaInsertar(NULL, persona);
+    int cmp = strcmp(id, nodo->id_caso);
+
+    if (cmp < 0) {
+        nodo->izquierdo = insertar_caso(nodo->izquierdo, id, nombre, fecha, zona, est, desc);
+    } else if (cmp > 0) {
+        nodo->derecho = insertar_caso(nodo->derecho, id, nombre, fecha, zona, est, desc);
+    } else {
+        /* id repetido: no debería pasar si el id se genera bien, pero por
+         * seguridad no se crea un nodo duplicado; se agrega al historial. */
+        agregar_historial(nodo, fecha, zona, est, desc);
         return nodo;
     }
 
-    int cmp = strcmp(clave, raiz->clave);
+    nodo->altura = 1 + max_val(obtener_altura(nodo->izquierdo), obtener_altura(nodo->derecho));
+    int balance = obtener_balance(nodo);
 
-    if (cmp < 0) {
-        raiz->izq = avlInsertar(raiz->izq, clave, persona);
-    } else if (cmp > 0) {
-        raiz->der = avlInsertar(raiz->der, clave, persona);
-    } else {
-        /*
-         * La clave ya existe: la persona se agrega a la lista
-         * enlazada existente del nodo. No se crea un nodo nuevo.
-         */
-        raiz->lista = listaInsertar(raiz->lista, persona);
-        return raiz;   /* No hay cambio de estructura, no se necesita rebalancear */
+    if (balance > 1 && strcmp(id, nodo->izquierdo->id_caso) < 0)
+        return rotar_derecha(nodo);
+
+    if (balance < -1 && strcmp(id, nodo->derecho->id_caso) > 0)
+        return rotar_izquierda(nodo);
+
+    if (balance > 1 && strcmp(id, nodo->izquierdo->id_caso) > 0) {
+        nodo->izquierdo = rotar_izquierda(nodo->izquierdo);
+        return rotar_derecha(nodo);
     }
 
-    /* ── Paso 2: Actualizar altura del nodo actual ───────────────────────── */
-
-    raiz->altura = 1 + maximo(altura(raiz->izq), altura(raiz->der));
-
-    /* ── Paso 3: Obtener factor de balance ───────────────────────────────── */
-
-    int balance = factorBalance(raiz);
-
-    /* ── Paso 4: Rebalancear si es necesario (4 casos) ───────────────────── */
-
-    /* Caso Left-Left (LL): balance > 1 y la clave fue a la izquierda-izquierda */
-    if (balance > 1 && strcmp(clave, raiz->izq->clave) < 0) {
-        return rotarDerecha(raiz);
+    if (balance < -1 && strcmp(id, nodo->derecho->id_caso) < 0) {
+        nodo->derecho = rotar_derecha(nodo->derecho);
+        return rotar_izquierda(nodo);
     }
 
-    /* Caso Right-Right (RR): balance < -1 y la clave fue a la derecha-derecha */
-    if (balance < -1 && strcmp(clave, raiz->der->clave) > 0) {
-        return rotarIzquierda(raiz);
-    }
-
-    /* Caso Left-Right (LR): balance > 1 y la clave fue a la izquierda-derecha */
-    if (balance > 1 && strcmp(clave, raiz->izq->clave) > 0) {
-        raiz->izq = rotarIzquierda(raiz->izq);
-        return rotarDerecha(raiz);
-    }
-
-    /* Caso Right-Left (RL): balance < -1 y la clave fue a la derecha-izquierda */
-    if (balance < -1 && strcmp(clave, raiz->der->clave) < 0) {
-        raiz->der = rotarDerecha(raiz->der);
-        return rotarIzquierda(raiz);
-    }
-
-    /* El nodo esta balanceado, retornar sin cambios */
-    return raiz;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  BUSQUEDA EXACTA
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-NodoAVL* avlBuscar(NodoAVL *raiz, const char *clave)
-{
-    if (!raiz) return NULL;
-
-    int cmp = strcmp(clave, raiz->clave);
-
-    if (cmp < 0) return avlBuscar(raiz->izq, clave);
-    if (cmp > 0) return avlBuscar(raiz->der, clave);
-
-    return raiz;   /* Encontrado */
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  BUSQUEDA POR RANGO [inicio, fin]
- * ═══════════════════════════════════════════════════════════════════════════
- *
- *  Recorrido in-order acotado: solo visita subarboles que pueden
- *  contener claves dentro del rango. Esto da complejidad O(log n + k).
- *
- *  Para fechas en formato YYYY-MM-DD, la comparacion lexicografica
- *  preserva el orden cronologico, lo cual permite usar strcmp directamente.
- */
-
-void avlBuscarRango(NodoAVL *raiz, const char *inicio, const char *fin,
-                    void (*callback)(NodoAVL *nodo))
-{
-    if (!raiz) return;
-
-    /*
-     * Solo explorar el subarbol izquierdo si la clave actual
-     * es MAYOR que el inicio del rango (podria haber resultados a la izq)
-     */
-    if (strcmp(raiz->clave, inicio) > 0) {
-        avlBuscarRango(raiz->izq, inicio, fin, callback);
-    }
-
-    /*
-     * Procesar el nodo actual si su clave esta dentro del rango [inicio, fin]
-     */
-    if (strcmp(raiz->clave, inicio) >= 0 && strcmp(raiz->clave, fin) <= 0) {
-        callback(raiz);
-    }
-
-    /*
-     * Solo explorar el subarbol derecho si la clave actual
-     * es MENOR que el fin del rango (podria haber resultados a la der)
-     */
-    if (strcmp(raiz->clave, fin) < 0) {
-        avlBuscarRango(raiz->der, inicio, fin, callback);
-    }
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  RECORRIDO IN-ORDER
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-void avlInOrder(NodoAVL *raiz, void (*callback)(NodoAVL *nodo))
-{
-    if (!raiz) return;
-
-    avlInOrder(raiz->izq, callback);
-    callback(raiz);
-    avlInOrder(raiz->der, callback);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  CONTEO
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-int avlContarNodos(NodoAVL *raiz)
-{
-    if (!raiz) return 0;
-    return 1 + avlContarNodos(raiz->izq) + avlContarNodos(raiz->der);
-}
-
-int avlContarPersonas(NodoAVL *raiz)
-{
-    if (!raiz) return 0;
-    return listaContarElementos(raiz->lista)
-         + avlContarPersonas(raiz->izq)
-         + avlContarPersonas(raiz->der);
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  UTILIDADES
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-int avlObtenerAltura(NodoAVL *raiz)
-{
-    return raiz ? raiz->altura : 0;
-}
-
-/* ═══════════════════════════════════════════════════════════════════════════
- *  LIBERACION DE MEMORIA
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-void avlLiberar(NodoAVL *raiz)
-{
-    if (!raiz) return;
-
-    avlLiberar(raiz->izq);
-    avlLiberar(raiz->der);
-    listaLiberar(raiz->lista);   /* Libera nodos de lista, NO los datos */
-    free(raiz);
+    return nodo;
 }

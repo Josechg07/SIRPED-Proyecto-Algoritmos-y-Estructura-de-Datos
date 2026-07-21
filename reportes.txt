@@ -1,0 +1,3 @@
+Prueba-001|Pedro|2026-06-24|La Guaira|Desaparecido|Desaparecido
+SIRPED-001|Pedro Aguila|2026-06-24|La Guaira|Desaparecido|Reporte Inicial.
+SIRPED-002|Maria Espinoza|2026-07-01|Caracas|Desaparecido|Salio de su residencia.

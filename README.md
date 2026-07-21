@@ -1,1 +1,0 @@
-Este archivo centraliza los structs (NodoHistorial, NodoAVL) y las firmas de las funciones de los tres módulos (lista enlazada, árbol AVL, ordenamiento/integración), sin implementarlas. Funciona como el contrato entre las tres partes del equipo: cada quien programa contra estos nombres y tipos de forma independiente, y al compilar todo junto encaja sin fricción.
