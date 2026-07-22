@@ -103,7 +103,6 @@ int main() {
         guardar_arbol_en_archivo("reportes.txt", raiz_sistema);
         printf("[Info] No se encontró reportes.txt previo; se creó uno con datos de ejemplo.\n");
     }
-    esperar_enter();
 
     do {
         desplegar_menu();

@@ -10,14 +10,10 @@ static void limpiar_pantalla(void) {
 #endif
 }
 
-/* Pausa para que el usuario alcance a leer el resultado de su última
- * acción ANTES de que limpiar_pantalla() lo borre al mostrar el menú
- * de nuevo. Sin esto, cualquier mensaje de éxito/error desaparece de
- * inmediato y da la falsa impresión de que la acción no funcionó. */
+/* Ya no se usa una pausa de entrada; el programa debe arrancar y
+ * mostrar el menú directamente sin esperar a que el usuario presione ENTER. */
 void esperar_enter(void) {
-    printf("\nPresione ENTER para continuar...");
-    fflush(stdout);
-    getchar();
+    (void)0;
 }
 
 static void mostrar_header_app(void) {

@@ -415,6 +415,13 @@
     </div>
     <div class="topbar-actions">
       <span class="count-pill" id="countPill">0 casos</span>
+      <button class="btn-secondary" id="btnCargarTxt" style="border: 1px solid var(--line); display:flex; align-items:center; gap:6px;">
+        📁 Cargar .txt
+      </button>
+      <button class="btn-secondary" id="btnGuardarTxt" style="border: 1px solid var(--line); display:flex; align-items:center; gap:6px;">
+        💾 Exportar .txt
+      </button>
+      <input type="file" id="fileInputTxt" accept=".txt" style="display:none">
       <button class="btn-primary" id="btnNuevoCaso">
         <span>+</span> Nuevo caso
       </button>
@@ -555,12 +562,12 @@ function mostrarToast(mensaje){
 
 /* ---------- Operaciones sobre los casos (equivalentes a main.c) ---------- */
 
-function insertarCaso(id, nombre, fecha, zona, descripcion){
+function insertarCaso(id, nombre, fecha, zona, descripcion, estado = "Desaparecido"){
   // Equivalente a insertar_caso() en arbol_avl.c: si el id ya existe,
   // no se crea un caso nuevo, se agrega al historial del existente.
   const existente = casos.find(c => c.id_caso === id);
   if (existente){
-    agregarHistorial(id, fecha, "Desaparecido", descripcion);
+    agregarHistorial(id, fecha, estado, descripcion);
     return existente;
   }
   const nuevo = {
@@ -568,7 +575,7 @@ function insertarCaso(id, nombre, fecha, zona, descripcion){
     nombre_persona: nombre,
     fecha_inicial: fecha,
     zona_geografica: zona,
-    historial: [{ fecha, estado: "Desaparecido", descripcion }]
+    historial: [{ fecha, estado, descripcion }]
   };
   casos.push(nuevo);
   return nuevo;
@@ -781,17 +788,132 @@ document.getElementById("formNuevoCaso").addEventListener("submit", (e) => {
   cerrarModal();
 });
 
+/* ---------- Conexión con datos del proyecto (reportes.txt / parser.c / ordenamiento.c) ---------- */
+
+function parsearLineaTxt(linea) {
+  // Formato: id|nombre|AAAA-MM-DD|zona|estado|descripcion
+  const partes = linea.split('|');
+  if (partes.length < 5) return null;
+  return {
+    id_caso: partes[0].trim(),
+    nombre_persona: partes[1].trim(),
+    fecha: partes[2].trim(),
+    zona_geografica: partes[3].trim(),
+    estado: partes[4].trim() || 'Desaparecido',
+    descripcion: partes.slice(5).join('|').trim() || 'Sin descripción'
+  };
+}
+
+function mergeSortCasos(arr) {
+  if (arr.length <= 1) return arr;
+  const medio = Math.floor(arr.length / 2);
+  const izq = mergeSortCasos(arr.slice(0, medio));
+  const der = mergeSortCasos(arr.slice(medio));
+
+  let resultado = [], i = 0, j = 0;
+  while (i < izq.length && j < der.length) {
+    if (izq[i].fecha_inicial <= der[j].fecha_inicial) {
+      resultado.push(izq[i++]);
+    } else {
+      resultado.push(der[j++]);
+    }
+  }
+  return resultado.concat(izq.slice(i)).concat(der.slice(j));
+}
+
+function cargarReportesDesdeTexto(contenidoTxt, notificar = true) {
+  const lineas = contenidoTxt.split(/\r?\n/);
+  let leidos = 0;
+
+  lineas.forEach(linea => {
+    linea = linea.trim();
+    if (!linea || linea.startsWith('#')) return;
+    const r = parsearLineaTxt(linea);
+    if (r) {
+      insertarCaso(r.id_caso, r.nombre_persona, r.fecha, r.zona_geografica, r.descripcion, r.estado);
+      leidos++;
+    }
+  });
+
+  casos = mergeSortCasos(casos);
+
+  if (casos.length > 0) {
+    casoSeleccionadoId = casos[0].id_caso;
+  }
+  poblarFiltroZonas();
+  renderLista();
+  renderDetalle();
+
+  if (notificar) {
+    mostrarToast(`Se cargaron ${leidos} reportes desde el archivo .txt (Merge Sort aplicado).`);
+  }
+}
+
+function exportarReportesTxt() {
+  let lineas = [];
+  casos.forEach(c => {
+    const ultimo = c.historial[c.historial.length - 1];
+    const estado = ultimo ? ultimo.estado : "Desaparecido";
+    const descripcion = ultimo ? ultimo.descripcion : "";
+    lineas.push(`${c.id_caso}|${c.nombre_persona}|${c.fecha_inicial}|${c.zona_geografica}|${estado}|${descripcion}`);
+  });
+
+  const blob = new Blob([lineas.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'reportes.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+  mostrarToast('Archivo reportes.txt exportado exitosamente.');
+}
+
+function autoCargarReportes() {
+  fetch('reportes.txt')
+    .then(res => {
+      if (!res.ok) throw new Error('No se pudo acceder a reportes.txt');
+      return res.text();
+    })
+    .then(texto => {
+      if (texto && texto.trim()) {
+        cargarReportesDesdeTexto(texto, false);
+        mostrarToast('Datos sincronizados automáticamente con reportes.txt.');
+      }
+    })
+    .catch(() => {
+      // Si la carga fetch falla (ej. apertura directa por archivo local file://),
+      // se mantienen los datos iniciales y se habilita la carga manual vía botón
+    });
+}
+
 /* ---------- Búsqueda y filtros ---------- */
 
 document.getElementById("buscarNombre").addEventListener("input", renderLista);
 document.getElementById("filtroZona").addEventListener("change", renderLista);
 document.getElementById("filtroEstado").addEventListener("change", renderLista);
 
+document.getElementById("btnCargarTxt").addEventListener("click", () => {
+  document.getElementById("fileInputTxt").click();
+});
+
+document.getElementById("fileInputTxt").addEventListener("change", (e) => {
+  const archivo = e.target.files[0];
+  if (!archivo) return;
+  const lector = new FileReader();
+  lector.onload = (event) => {
+    cargarReportesDesdeTexto(event.target.result, true);
+  };
+  lector.readAsText(archivo);
+});
+
+document.getElementById("btnGuardarTxt").addEventListener("click", exportarReportesTxt);
+
 /* ---------- Arranque ---------- */
 
 poblarFiltroZonas();
 renderLista();
 renderDetalle();
+autoCargarReportes();
 </script>
 
 </body>
