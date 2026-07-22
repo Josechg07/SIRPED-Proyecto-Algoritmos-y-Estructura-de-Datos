@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIRPED — Sistema de Registro y Seguimiento de Personas Desaparecidas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F7F5F0;
+    --paper-raised: #FFFFFF;
+    --ink: #1C2321;
+    --ink-soft: #5B6360;
+    --line: #DDD8CE;
+    --primary: #2B3A42;
+    --primary-soft: #3E525C;
+    --amber: #B8790F;
+    --amber-bg: #FBEDD6;
+    --teal: #146D62;
+    --teal-bg: #DEEFE9;
+    --gray-status: #6B6560;
+    --gray-status-bg: #EAE7E0;
+    --radius: 10px;
+    --shadow: 0 1px 2px rgba(28,35,33,0.06), 0 4px 14px rgba(28,35,33,0.05);
+  }
+
+  *{ box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection{ background: var(--amber-bg); }
+
+  .app{
+    display:grid;
+    grid-template-columns: 380px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ---------- HEADER (spans full width, sits above grid) ---------- */
+  .topbar{
+    grid-column: 1 / -1;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--line);
+    background: var(--paper-raised);
+  }
+
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:10px;
+  }
+  .brand-mark{
+    font-family:'Fraunces', serif;
+    font-weight:600;
+    font-size:22px;
+    letter-spacing: 0.01em;
+    color: var(--primary);
+  }
+  .brand-sub{
+    font-size:12.5px;
+    color: var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .topbar-actions{ display:flex; gap:10px; align-items:center; }
+
+  .count-pill{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+  }
+
+  button{
+    font-family:'Inter', sans-serif;
+    cursor:pointer;
+    border:none;
+    outline-offset: 2px;
+  }
+  button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{
+    outline: 2px solid var(--primary-soft);
+  }
+
+  .btn-primary{
+    background: var(--primary);
+    color: #F7F5F0;
+    padding: 10px 16px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    font-weight: 500;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    transition: background 0.15s ease;
+  }
+  .btn-primary:hover{ background: var(--primary-soft); }
+
+  /* ---------- SIDEBAR ---------- */
+  .sidebar{
+    border-right: 1px solid var(--line);
+    background: var(--paper-raised);
+    display:flex;
+    flex-direction:column;
+    min-height: 0;
+  }
+
+  .search-block{
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--line);
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  input[type="text"], input[type="search"], select, textarea{
+    width:100%;
+    font-family:'Inter', sans-serif;
+    font-size: 13.5px;
+    padding: 9px 11px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  input::placeholder, textarea::placeholder{ color: #9B958B; }
+
+  .filter-row{ display:flex; gap:8px; }
+  .filter-row select{ flex:1; }
+
+  .case-list{
+    flex:1;
+    overflow-y:auto;
+    padding: 6px 12px 20px;
+  }
+
+  .case-card{
+    padding: 13px 14px;
+    margin-bottom: 8px;
+    border-radius: var(--radius);
+    border: 1px solid transparent;
+    cursor:pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  .case-card:hover{ background: var(--paper); }
+  .case-card.active{
+    background: var(--paper);
+    border-color: var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  .case-card-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:8px;
+    margin-bottom:5px;
+  }
+  .case-name{ font-weight:600; font-size:14.5px; }
+  .case-meta{
+    font-size:12px;
+    color: var(--ink-soft);
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .badge{
+    font-size: 11px;
+    font-weight:500;
+    padding: 3px 9px;
+    border-radius: 20px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .badge.desaparecido{ background: var(--amber-bg); color: #7A4E0A; }
+  .badge.encontrado{ background: var(--teal-bg); color: #0C4A42; }
+  .badge.otro{ background: var(--gray-status-bg); color: #4B4640; }
+
+  .empty-list{
+    text-align:center;
+    padding: 40px 20px;
+    color: var(--ink-soft);
+    font-size: 13.5px;
+    line-height:1.6;
+  }
+
+  /* ---------- MAIN PANEL ---------- */
+  .main{
+    padding: 32px 44px 60px;
+    overflow-y:auto;
+  }
+
+  .placeholder{
+    max-width: 420px;
+    margin: 90px auto 0;
+    text-align:center;
+    color: var(--ink-soft);
+  }
+  .placeholder-mark{
+    font-family:'Fraunces', serif;
+    font-size: 26px;
+    color: var(--primary);
+    margin-bottom: 10px;
+  }
+  .placeholder p{ font-size: 14px; line-height:1.6; }
+
+  .case-detail{ max-width: 720px; }
+
+  .detail-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 26px;
+  }
+
+  .detail-name{
+    font-family:'Fraunces', serif;
+    font-size: 30px;
+    font-weight:600;
+    color: var(--ink);
+    margin: 0 0 6px;
+  }
+  .detail-id{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+  .detail-facts{
+    display:flex;
+    gap: 22px;
+    margin-top: 12px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+  }
+  .detail-facts strong{ color: var(--ink); font-weight:500; }
+
+  .section-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin: 0 0 16px;
+  }
+
+  /* --- Timeline / ledger (signature element) --- */
+  .timeline{
+    position:relative;
+    padding-left: 26px;
+    margin-bottom: 40px;
+  }
+  .timeline::before{
+    content:"";
+    position:absolute;
+    left: 5px;
+    top: 6px;
+    bottom: 6px;
+    width: 1px;
+    background: var(--line);
+  }
+  .timeline-entry{
+    position:relative;
+    padding-bottom: 22px;
+  }
+  .timeline-entry:last-child{ padding-bottom:0; }
+  .timeline-dot{
+    position:absolute;
+    left: -26px;
+    top: 4px;
+    width: 11px;
+    height: 11px;
+    border-radius:50%;
+    background: var(--paper-raised);
+    border: 2px solid var(--primary);
+  }
+  .timeline-entry:first-child .timeline-dot{
+    background: var(--amber);
+    border-color: var(--amber);
+  }
+  .timeline-date{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 3px;
+  }
+  .timeline-status{
+    font-weight: 600;
+    font-size: 14px;
+    margin-right: 8px;
+  }
+  .timeline-desc{
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    margin-top: 3px;
+    line-height:1.5;
+  }
+
+  .update-form{
+    background: var(--paper-raised);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .form-grid{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .form-grid.full{ grid-template-columns: 1fr; }
+  label{
+    display:block;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin-bottom: 5px;
+  }
+  textarea{ min-height: 64px; resize:vertical; font-family:'Inter',sans-serif; }
+
+  .form-actions{ display:flex; justify-content:flex-end; margin-top: 6px; }
+  .btn-secondary{
+    background: transparent;
+    color: var(--ink-soft);
+    padding: 9px 12px;
+    font-size: 13.5px;
+    border-radius: 7px;
+  }
+  .btn-secondary:hover{ background: var(--paper); }
+
+  /* ---------- MODAL: nuevo caso ---------- */
+  .modal-overlay{
+    position:fixed; inset:0;
+    background: rgba(28,35,33,0.35);
+    display:none;
+    align-items:flex-start;
+    justify-content:center;
+    padding-top: 8vh;
+    z-index: 50;
+  }
+  .modal-overlay.open{ display:flex; }
+  .modal{
+    background: var(--paper-raised);
+    width: 480px;
+    max-width: 92vw;
+    border-radius: 14px;
+    box-shadow: 0 10px 40px rgba(28,35,33,0.25);
+    padding: 26px 26px 20px;
+  }
+  .modal h2{
+    font-family:'Fraunces', serif;
+    font-size: 20px;
+    margin: 0 0 4px;
+  }
+  .modal p.hint{
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin: 0 0 18px;
+  }
+  .modal .form-grid{ margin-bottom: 12px; }
+  .modal-actions{
+    display:flex;
+    justify-content:flex-end;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .toast{
+    position:fixed;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--primary);
+    color: #F7F5F0;
+    padding: 11px 18px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 60;
+  }
+  .toast.show{ opacity:1; transform: translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition: none !important; }
+  }
+
+  @media (max-width: 820px){
+    .app{ grid-template-columns: 1fr; }
+    .sidebar{ border-right:none; border-bottom:1px solid var(--line); max-height: 46vh; }
+    .main{ padding: 24px 20px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <span class="brand-mark">SIRPED</span>
+      <span class="brand-sub">registro &amp; seguimiento</span>
+    </div>
+    <div class="topbar-actions">
+      <span class="count-pill" id="countPill">0 casos</span>
+      <button class="btn-primary" id="btnNuevoCaso">
+        <span>+</span> Nuevo caso
+      </button>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="search-block">
+      <input type="search" id="buscarNombre" placeholder="Buscar por nombre o ID…">
+      <div class="filter-row">
+        <select id="filtroZona">
+          <option value="">Todas las zonas</option>
+        </select>
+        <select id="filtroEstado">
+          <option value="">Todos los estados</option>
+          <option value="Desaparecido">Desaparecido</option>
+          <option value="Encontrado">Encontrado</option>
+        </select>
+      </div>
+    </div>
+    <div class="case-list" id="caseList"></div>
+  </aside>
+
+  <main class="main" id="mainPanel">
+    <div class="placeholder">
+      <div class="placeholder-mark">Ningún caso seleccionado</div>
+      <p>Elige un caso de la lista para ver su historial completo, o registra uno nuevo con el botón de arriba.</p>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Registrar nuevo caso</h2>
+    <p class="hint">Crea la ficha inicial. Podrás agregar novedades después sin perder esta información.</p>
+    <form id="formNuevoCaso">
+      <div class="form-grid">
+        <div>
+          <label for="nc_id">ID del caso</label>
+          <input type="text" id="nc_id" placeholder="SIRPED-003" required>
+        </div>
+        <div>
+          <label for="nc_nombre">Nombre completo</label>
+          <input type="text" id="nc_nombre" placeholder="Nombre y apellido" required>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label for="nc_fecha">Fecha (AAAA-MM-DD)</label>
+          <input type="date" id="nc_fecha" required>
+        </div>
+        <div>
+          <label for="nc_zona">Zona</label>
+          <input type="text" id="nc_zona" placeholder="Ej. La Guaira" required>
+        </div>
+      </div>
+      <div class="form-grid full">
+        <div>
+          <label for="nc_desc">Descripción del reporte</label>
+          <textarea id="nc_desc" placeholder="Circunstancias, última vez visto, características…" required></textarea>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="btnCancelarNuevo">Cancelar</button>
+        <button type="submit" class="btn-primary">Registrar caso</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================================
+ * MODELO DE DATOS
+ * ----------------------------------------------------------------------------
+ * Esta interfaz es la capa de presentación. Los nombres de campo siguen a
+ * propósito la misma forma que estructuras.h del programa en C (id_caso,
+ * nombre_persona, fecha_inicial, zona_geografica, historial[]), para que
+ * conectar esto a un backend real más adelante sea un cambio de "de dónde
+ * vienen los datos", no de "cómo se llaman los datos".
+ *
+ * Ahora mismo los casos viven en memoria (un arreglo de JS), igual que el
+ * árbol AVL vive en memoria mientras el programa en C está corriendo. La
+ * función guardarCaso()/agregarHistorial() son el punto exacto donde,
+ * cuando haya un servidor, se reemplazaría el arreglo por una llamada
+ * fetch() a la API (ej. POST /casos, POST /casos/:id/historial).
+ * ============================================================================ */
+
+let casos = [
+  {
+    id_caso: "SIRPED-001",
+    nombre_persona: "Pedro Águila",
+    fecha_inicial: "2026-06-24",
+    zona_geografica: "La Guaira",
+    historial: [
+      { fecha: "2026-06-24", estado: "Desaparecido", descripcion: "Reportado desaparecido en La Guaira." },
+      { fecha: "2026-07-02", estado: "Encontrado", descripcion: "Encontrado con heridas, trasladado al hospital de La Guaira." }
+    ]
+  },
+  {
+    id_caso: "SIRPED-002",
+    nombre_persona: "María Espinoza",
+    fecha_inicial: "2026-07-01",
+    zona_geografica: "Caracas",
+    historial: [
+      { fecha: "2026-07-01", estado: "Desaparecido", descripcion: "Salió de su residencia en Chacao y no regresó." }
+    ]
+  }
+];
+
+let casoSeleccionadoId = casos[0].id_caso;
+
+/* ---------- Utilidades ---------- */
+
+function estadoActual(caso){
+  return caso.historial[caso.historial.length - 1].estado;
+}
+
+function claseBadge(estado){
+  if (estado === "Desaparecido") return "desaparecido";
+  if (estado === "Encontrado") return "encontrado";
+  return "otro";
+}
+
+function formatearFecha(iso){
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+function mostrarToast(mensaje){
+  const toast = document.getElementById("toast");
+  toast.textContent = mensaje;
+  toast.classList.add("show");
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.remove("show"), 2600);
+}
+
+/* ---------- Operaciones sobre los casos (equivalentes a main.c) ---------- */
+
+function insertarCaso(id, nombre, fecha, zona, descripcion){
+  // Equivalente a insertar_caso() en arbol_avl.c: si el id ya existe,
+  // no se crea un caso nuevo, se agrega al historial del existente.
+  const existente = casos.find(c => c.id_caso === id);
+  if (existente){
+    agregarHistorial(id, fecha, "Desaparecido", descripcion);
+    return existente;
+  }
+  const nuevo = {
+    id_caso: id,
+    nombre_persona: nombre,
+    fecha_inicial: fecha,
+    zona_geografica: zona,
+    historial: [{ fecha, estado: "Desaparecido", descripcion }]
+  };
+  casos.push(nuevo);
+  return nuevo;
+}
+
+function agregarHistorial(id, fecha, estado, descripcion){
+  // Equivalente a agregar_historial() en lista_historial.c: se agrega
+  // AL FINAL, sin tocar ni borrar las entradas anteriores.
+  const caso = casos.find(c => c.id_caso === id);
+  if (!caso) return null;
+  caso.historial.push({ fecha, estado, descripcion });
+  return caso;
+}
+
+/* ---------- Render: lista lateral ---------- */
+
+function poblarFiltroZonas(){
+  const select = document.getElementById("filtroZona");
+  const zonaActual = select.value;
+  const zonas = [...new Set(casos.map(c => c.zona_geografica))].sort();
+
+  select.innerHTML = '<option value="">Todas las zonas</option>' +
+    zonas.map(z => `<option value="${z}">${z}</option>`).join("");
+  select.value = zonaActual;
+}
+
+function renderLista(){
+  const contenedor = document.getElementById("caseList");
+  const textoBusqueda = document.getElementById("buscarNombre").value.trim().toLowerCase();
+  const zonaFiltro = document.getElementById("filtroZona").value;
+  const estadoFiltro = document.getElementById("filtroEstado").value;
+
+  const filtrados = casos.filter(c => {
+    const coincideTexto = !textoBusqueda ||
+      c.nombre_persona.toLowerCase().includes(textoBusqueda) ||
+      c.id_caso.toLowerCase().includes(textoBusqueda);
+    const coincideZona = !zonaFiltro || c.zona_geografica === zonaFiltro;
+    const coincideEstado = !estadoFiltro || estadoActual(c) === estadoFiltro;
+    return coincideTexto && coincideZona && coincideEstado;
+  });
+
+  document.getElementById("countPill").textContent =
+    `${casos.length} caso${casos.length === 1 ? "" : "s"}`;
+
+  if (filtrados.length === 0){
+    contenedor.innerHTML = `<div class="empty-list">Ningún caso coincide con la búsqueda.<br>Ajusta los filtros o registra un caso nuevo.</div>`;
+    return;
+  }
+
+  contenedor.innerHTML = filtrados.map(c => {
+    const estado = estadoActual(c);
+    const activo = c.id_caso === casoSeleccionadoId ? "active" : "";
+    return `
+      <div class="case-card ${activo}" data-id="${c.id_caso}" tabindex="0" role="button">
+        <div class="case-card-top">
+          <span class="case-name">${c.nombre_persona}</span>
+          <span class="badge ${claseBadge(estado)}">${estado}</span>
+        </div>
+        <div class="case-meta">${c.id_caso} · ${c.zona_geografica}</div>
+      </div>
+    `;
+  }).join("");
+
+  contenedor.querySelectorAll(".case-card").forEach(card => {
+    card.addEventListener("click", () => seleccionarCaso(card.dataset.id));
+    card.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); seleccionarCaso(card.dataset.id); }
+    });
+  });
+}
+
+/* ---------- Render: panel principal (detalle del caso) ---------- */
+
+function seleccionarCaso(id){
+  casoSeleccionadoId = id;
+  renderLista();
+  renderDetalle();
+}
+
+function renderDetalle(){
+  const panel = document.getElementById("mainPanel");
+  const caso = casos.find(c => c.id_caso === casoSeleccionadoId);
+
+  if (!caso){
+    panel.innerHTML = `
+      <div class="placeholder">
+        <div class="placeholder-mark">Ningún caso seleccionado</div>
+        <p>Elige un caso de la lista para ver su historial completo, o registra uno nuevo con el botón de arriba.</p>
+      </div>`;
+    return;
+  }
+
+  const historialOrdenado = [...caso.historial].reverse(); // más reciente arriba
+
+  panel.innerHTML = `
+    <div class="case-detail">
+      <div class="detail-header">
+        <div>
+          <h1 class="detail-name">${caso.nombre_persona}</h1>
+          <div class="detail-id">${caso.id_caso}</div>
+          <div class="detail-facts">
+            <span>Zona: <strong>${caso.zona_geografica}</strong></span>
+            <span>Reporte inicial: <strong>${formatearFecha(caso.fecha_inicial)}</strong></span>
+          </div>
+        </div>
+        <span class="badge ${claseBadge(estadoActual(caso))}" style="font-size:12.5px; padding:6px 12px;">
+          ${estadoActual(caso)}
+        </span>
+      </div>
+
+      <p class="section-label">Historial cronológico</p>
+      <div class="timeline">
+        ${historialOrdenado.map(h => `
+          <div class="timeline-entry">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">${formatearFecha(h.fecha)}</div>
+            <span class="timeline-status">${h.estado}</span>
+            <div class="timeline-desc">${h.descripcion}</div>
+          </div>
+        `).join("")}
+      </div>
+
+      <p class="section-label">Agregar novedad</p>
+      <div class="update-form">
+        <form id="formHistorial">
+          <div class="form-grid">
+            <div>
+              <label for="h_fecha">Fecha (AAAA-MM-DD)</label>
+              <input type="date" id="h_fecha" required>
+            </div>
+            <div>
+              <label for="h_estado">Estado</label>
+              <select id="h_estado">
+                <option>Desaparecido</option>
+                <option>Encontrado</option>
+                <option>Fallecido</option>
+                <option>Cerrado</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid full">
+            <div>
+              <label for="h_desc">Descripción de la novedad</label>
+              <textarea id="h_desc" placeholder="Qué se supo, dónde, en qué condición…" required></textarea>
+            </div>
+          </div>
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Agregar al historial</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+
+  document.getElementById("formHistorial").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const fecha = document.getElementById("h_fecha").value;
+    const estado = document.getElementById("h_estado").value;
+    const descripcion = document.getElementById("h_desc").value.trim();
+    if (!fecha || !descripcion) return;
+
+    agregarHistorial(caso.id_caso, fecha, estado, descripcion);
+    mostrarToast(`Historial de ${caso.nombre_persona} actualizado.`);
+    renderDetalle();
+    renderLista();
+  });
+}
+
+/* ---------- Modal: nuevo caso ---------- */
+
+const modalOverlay = document.getElementById("modalOverlay");
+
+function abrirModal(){
+  modalOverlay.classList.add("open");
+  document.getElementById("nc_id").focus();
+}
+function cerrarModal(){
+  modalOverlay.classList.remove("open");
+  document.getElementById("formNuevoCaso").reset();
+}
+
+document.getElementById("btnNuevoCaso").addEventListener("click", abrirModal);
+document.getElementById("btnCancelarNuevo").addEventListener("click", cerrarModal);
+modalOverlay.addEventListener("click", (e) => { if (e.target === modalOverlay) cerrarModal(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && modalOverlay.classList.contains("open")) cerrarModal();
+});
+
+document.getElementById("formNuevoCaso").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const id = document.getElementById("nc_id").value.trim();
+  const nombre = document.getElementById("nc_nombre").value.trim();
+  const fecha = document.getElementById("nc_fecha").value;
+  const zona = document.getElementById("nc_zona").value.trim();
+  const descripcion = document.getElementById("nc_desc").value.trim();
+
+  if (!id || !nombre || !fecha || !zona || !descripcion) return;
+
+  const yaExistia = casos.some(c => c.id_caso === id);
+  insertarCaso(id, nombre, fecha, zona, descripcion);
+
+  mostrarToast(yaExistia
+    ? `El ID ${id} ya existía: se agregó como novedad al caso.`
+    : `Caso ${id} registrado.`);
+
+  casoSeleccionadoId = id;
+  poblarFiltroZonas();
+  renderLista();
+  renderDetalle();
+  cerrarModal();
+});
+
+/* ---------- Búsqueda y filtros ---------- */
+
+document.getElementById("buscarNombre").addEventListener("input", renderLista);
+document.getElementById("filtroZona").addEventListener("change", renderLista);
+document.getElementById("filtroEstado").addEventListener("change", renderLista);
+
+/* ---------- Arranque ---------- */
+
+poblarFiltroZonas();
+renderLista();
+renderDetalle();
+</script>
+
+</body>
+</html>
